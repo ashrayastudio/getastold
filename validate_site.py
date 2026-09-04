@@ -1,0 +1,372 @@
+#!/usr/bin/env python3
+"""Fail-closed validation for the approved As Told website/support notice."""
+
+from __future__ import annotations
+
+from html.parser import HTMLParser
+from html import unescape
+from pathlib import Path
+from urllib.parse import unquote
+import re
+import sys
+import tempfile
+
+
+REPO_ROOT = Path(__file__).resolve().parent
+ROOT = REPO_ROOT / "docs"
+PAGES = {
+    Path("index.html"): "https://getastold.com/",
+    Path("privacy.html"): "https://getastold.com/privacy",
+}
+SUPPORT_WARNING = "Please do not send private family stories, photos, voice recordings, or exports."
+CONTROLLER_SENTENCE = "The data controller is Kalpesh Patel."
+GOOGLE_PRIVACY = "https://policies.google.com/privacy"
+GITHUB_PRIVACY = "https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement"
+HOME_TEXT = (
+    "As Told",
+    "Product information is being updated.",
+    "As Told support:",
+    "appportfolio.contact@gmail.com",
+    SUPPORT_WARNING,
+    "The email link opens your email app. Nothing is sent or attached automatically.",
+    "Website and support privacy",
+)
+PRIVACY_TEXT = (
+    "As Told",
+    "Website and support privacy",
+    "Updated September 3, 2026.",
+    "This notice covers this website and voluntary support email. App privacy information is being updated; this is not the full app privacy policy.",
+    "Controller and contact",
+    CONTROLLER_SENTENCE,
+    "As Told support:",
+    "appportfolio.contact@gmail.com",
+    "Information you choose to send",
+    "If you email support, your email address and the message or attachments you choose to send are used to respond to your request. The email link opens your email app. Nothing is sent or attached automatically.",
+    SUPPORT_WARNING,
+    "Support correspondence is handled by your email provider and Gmail, outside this website. Their own privacy policies also apply.",
+    "Google privacy policy",
+    "Website hosting",
+    "This site is hosted on GitHub Pages. GitHub receives technical request information, such as your IP address, when serving the site. This site's code adds no contact forms, analytics, advertising, or cookies.",
+    "GitHub privacy statement",
+    "Support retention",
+    "We monitor the support inbox and delete resolved conversations from the support mailbox within 90 days, unless legally required to retain them longer. Copies retained by your email provider or Gmail are subject to their own policies.",
+    "Privacy questions and requests",
+    "Use the contact above for privacy questions or to request access, correction, or deletion of your support messages. Do not send identity documents or sensitive personal information with your initial request.",
+    "Changes to this notice will appear on this page with an updated date.",
+    "Back to As Told support",
+)
+APPROVED_SUPPORT_LINK = "mailto:appportfolio.contact@gmail.com?subject=As%20Told%20support"
+FORBIDDEN_SOURCE_MARKERS = (
+    "ashraya",
+    "ashrayastudio",
+    "kalpesh patel",
+    "copyright",
+    "©",
+)
+
+
+def repository_html_paths(root: Path = ROOT) -> list[Path]:
+    """Return every repository HTML source while excluding Git internals."""
+    return sorted(
+        path.relative_to(root)
+        for path in root.rglob("*.html")
+        if ".git" not in path.relative_to(root).parts
+    )
+
+
+def validate_public_files(root: Path = ROOT) -> list[str]:
+    expected = {"index.html", "privacy.html", "CNAME", ".nojekyll"}
+    files = {path.relative_to(root).as_posix() for path in root.rglob("*") if path.is_file()}
+    errors = []
+    if files != expected:
+        errors.append("public directory differs from the exact four-file allowlist")
+    if any(path.is_symlink() for path in root.rglob("*")):
+        errors.append("public symlinks are not permitted")
+    marker = root / ".nojekyll"
+    if marker.is_file() and marker.read_bytes() != b"":
+        errors.append(".nojekyll must be empty")
+    return errors
+
+
+class SupportPageParser(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.body_depth = 0
+        self.ignored_depth = 0
+        self.title_depth = 0
+        self.title = ""
+        self.description = ""
+        self.canonical = ""
+        self.h1_count = 0
+        self.main_count = 0
+        self.script_count = 0
+        self.form_count = 0
+        self.anchor_count = 0
+        self.embedded_count = 0
+        self.resource_references: list[str] = []
+        self.links: list[str] = []
+        self.attribute_values: list[str] = []
+        self.visible_text: list[str] = []
+        self.unsafe_markup = False
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        values = dict(attrs)
+        self.attribute_values.extend(value for _, value in attrs if value)
+        if len(values) != len(attrs) or any(name.startswith("on") for name in values):
+            self.unsafe_markup = True
+        if tag == "meta" and values.get("http-equiv"):
+            self.unsafe_markup = True
+        if any(name in values for name in ("srcdoc", "srcset", "ping", "action", "formaction")):
+            self.unsafe_markup = True
+        if tag == "body":
+            self.body_depth += 1
+        elif tag in {"style", "script"}:
+            self.ignored_depth += 1
+        if tag == "title":
+            self.title_depth += 1
+        elif tag == "h1":
+            self.h1_count += 1
+        elif tag == "main":
+            self.main_count += 1
+        elif tag == "script":
+            self.script_count += 1
+            if values.get("src"):
+                self.resource_references.append(values["src"] or "")
+        elif tag == "form":
+            self.form_count += 1
+        elif tag == "a":
+            self.anchor_count += 1
+            self.links.append(values.get("href") or "")
+            if values.get("href"):
+                self.resource_references.append(values["href"] or "")
+        elif tag in {"img", "iframe", "object", "embed", "source", "audio", "video", "svg", "base"}:
+            self.embedded_count += 1
+            reference = values.get("src") or values.get("data") or ""
+            if reference:
+                self.resource_references.append(reference)
+        elif tag == "meta" and values.get("name") == "description":
+            self.description = values.get("content") or ""
+        elif tag == "link" and values.get("rel") == "canonical":
+            self.canonical = values.get("href") or ""
+        elif tag == "link":
+            if values.get("href"):
+                self.resource_references.append(values["href"] or "")
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag == "body" and self.body_depth:
+            self.body_depth -= 1
+        elif tag in {"style", "script"} and self.ignored_depth:
+            self.ignored_depth -= 1
+        if tag == "title" and self.title_depth:
+            self.title_depth -= 1
+
+    def handle_data(self, data: str) -> None:
+        if self.title_depth:
+            self.title += data
+        if self.body_depth and not self.ignored_depth:
+            normalized = " ".join(data.split())
+            if normalized:
+                self.visible_text.append(normalized)
+
+
+def validate_source(source: str, canonical: str) -> list[str]:
+    parser = SupportPageParser()
+    parser.feed(source)
+    errors: list[str] = []
+    decoded = source
+    for _ in range(5):
+        decoded = unquote(unescape(decoded))
+    lowered = decoded.lower()
+    public_text = " ".join(
+        [parser.title, parser.description, *parser.visible_text, *parser.attribute_values]
+    ).lower()
+
+    privacy = canonical == PAGES[Path("privacy.html")]
+    expected_text = PRIVACY_TEXT if privacy else HOME_TEXT
+    expected_title = "As Told — Website and support privacy" if privacy else "As Told — Product information is being updated"
+    expected_description = "How the As Told website and support email handle information." if privacy else "Product information for As Told is being updated."
+    expected_links = [APPROVED_SUPPORT_LINK, GOOGLE_PRIVACY, GITHUB_PRIVACY, "/"] if privacy else [APPROVED_SUPPORT_LINK, "/privacy"]
+    if canonical not in PAGES.values():
+        errors.append("unregistered canonical")
+    if parser.title.strip() != expected_title:
+        errors.append("unexpected title")
+    if parser.description != expected_description:
+        errors.append("unexpected meta description")
+    if parser.canonical != canonical:
+        errors.append("unexpected canonical")
+    if parser.h1_count != 1:
+        errors.append("expected exactly one h1")
+    if parser.main_count != 1:
+        errors.append("expected exactly one main")
+    if tuple(parser.visible_text) != expected_text:
+        errors.append("visible text differs from the exact approved website/support copy")
+    if parser.unsafe_markup:
+        errors.append("unsafe attributes or redirect markup are not permitted")
+    if parser.script_count:
+        errors.append("JavaScript is not permitted")
+    if parser.form_count:
+        errors.append("forms are not permitted")
+    if parser.links != expected_links:
+        errors.append("links differ from the exact approved route/mail/privacy set")
+    if parser.embedded_count:
+        errors.append("embedded assets or content are not permitted")
+    if "@import" in lowered or "url(" in lowered:
+        errors.append("external or referenced CSS assets are not permitted")
+    identity_source = lowered
+    if privacy:
+        exact_paragraph = f"<p>{CONTROLLER_SENTENCE}</p>"
+        if source.count(exact_paragraph) != 1:
+            errors.append("exactly one approved controller paragraph is required on privacy")
+        identity_source = identity_source.replace(exact_paragraph.lower(), "", 1)
+    for marker in FORBIDDEN_SOURCE_MARKERS:
+        if marker.lower() in identity_source:
+            errors.append(f"forbidden claim or identity marker {marker}")
+    for email in re.findall(r"[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}", unquote(public_text)):
+        if email != "appportfolio.contact@gmail.com":
+            errors.append("unapproved public mailbox")
+    for reference in parser.resource_references:
+        if reference not in expected_links:
+            errors.append("unapproved resource reference")
+    return errors
+
+
+def run_self_test() -> int:
+    source = (ROOT / "index.html").read_text(encoding="utf-8")
+    mutations = (
+        source.replace("<main ", '<main title="Ashraya&#32;Studio" '),
+        source.replace("<main ", '<main title="%2541shraya" '),
+        source.replace("<main ", '<main title="Kalpesh Patel" '),
+        source.replace("<main ", '<main title="other%40gmail.com" '),
+        source.replace(APPROVED_SUPPORT_LINK, "mailto:other@gmail.com?subject=As%20Told%20support"),
+        source.replace(APPROVED_SUPPORT_LINK, APPROVED_SUPPORT_LINK + "&amp;cc=other@gmail.com"),
+        source.replace("appportfolio.contact@gmail.com", "appportfolio.contact+astold@gmail.com"),
+        source.replace("appportfolio.contact@gmail.com", "appportfoliocontact@gmail.com"),
+        source.replace("appportfolio.contact@gmail.com", "appportfolio.contact@gmail.com.evil.example"),
+        source.replace("As Told</p>", "Ashraya</p>"),
+        source.replace("</main>", "<p>Download on the App Store</p></main>"),
+        source.replace("</main>", "<form></form></main>"),
+        source.replace("</main>", "<script></script></main>"),
+        source.replace("</main>", '<img src="https://example.invalid/pixel.png" alt=""></main>'),
+        source.replace("</main>", '<a href="mailto:test@example.invalid">Contact</a></main>'),
+        source.replace("<body>", '<body onload="alert(1)">'),
+        source.replace("</head>", '<meta http-equiv="refresh" content="0;url=https://example.invalid"></head>'),
+        source.replace('href="/privacy"', 'href="/privacy" ping="https://example.invalid"'),
+        source.replace("</main>", '<p>The data controller is Kalpesh Patel.</p></main>'),
+    )
+    for number, mutation in enumerate(mutations, start=1):
+        if not validate_source(mutation, PAGES[Path("index.html")]):
+            print(f"self-test mutation {number} was not rejected", file=sys.stderr)
+            return 1
+    privacy = (ROOT / "privacy.html").read_text(encoding="utf-8")
+    privacy_mutations = (
+        privacy.replace(CONTROLLER_SENTENCE, "The data controller is As Told."),
+        privacy.replace(f"<p>{CONTROLLER_SENTENCE}</p>", ""),
+        privacy.replace("</main>", f"<p>{CONTROLLER_SENTENCE}</p></main>"),
+        privacy.replace("<main ", '<main title="Kalpesh Patel" '),
+        privacy.replace("90 days", "365 days"),
+        privacy.replace("not the full app privacy policy", "the full app privacy policy"),
+        privacy.replace("Gmail", "another provider"),
+        privacy.replace(GOOGLE_PRIVACY, "https://policies.google.com.evil.example/privacy"),
+        privacy.replace(APPROVED_SUPPORT_LINK, APPROVED_SUPPORT_LINK + "&amp;body=private"),
+        privacy.replace("</main>", '<iframe src="https://example.invalid"></iframe></main>'),
+    )
+    for number, mutation in enumerate(privacy_mutations, start=1):
+        if not validate_source(mutation, PAGES[Path("privacy.html")]):
+            print(f"privacy self-test mutation {number} was not rejected", file=sys.stderr)
+            return 1
+    for path, canonical in PAGES.items():
+        if validate_source((ROOT / path).read_text(encoding="utf-8"), canonical):
+            print(f"self-test approved page {path} was rejected", file=sys.stderr)
+            return 1
+    with tempfile.TemporaryDirectory(prefix="astold-site-validator.") as temporary:
+        root = Path(temporary)
+        future = root / "future" / "nested.html"
+        future.parent.mkdir(parents=True)
+        future.write_text("<p>Future</p>", encoding="utf-8")
+        if repository_html_paths(root) != [Path("future/nested.html")]:
+            print("self-test did not discover a nested future HTML page", file=sys.stderr)
+            return 1
+        if not validate_public_files(root):
+            print("self-test did not reject unapproved public files", file=sys.stderr)
+            return 1
+    with tempfile.TemporaryDirectory(prefix="astold-public-files.") as temporary:
+        root = Path(temporary)
+        for name in ("index.html", "privacy.html", "CNAME", ".nojekyll"):
+            (root / name).touch()
+        if validate_public_files(root):
+            print("self-test rejected the exact public file set", file=sys.stderr)
+            return 1
+        extra = root / "AGENTS.md"
+        extra.write_text("Internal instructions", encoding="utf-8")
+        if not validate_public_files(root):
+            print("self-test allowed internal instructions on the website", file=sys.stderr)
+            return 1
+        extra.unlink()
+        (root / ".nojekyll").write_text("Unexpected public content", encoding="utf-8")
+        if not validate_public_files(root):
+            print("self-test allowed content in .nojekyll", file=sys.stderr)
+            return 1
+        (root / ".nojekyll").write_text("", encoding="utf-8")
+        extra.symlink_to(root / "index.html")
+        if not validate_public_files(root):
+            print("self-test allowed a public symlink", file=sys.stderr)
+            return 1
+    if validate_public_files():
+        print("self-test approved public file set rejected", file=sys.stderr)
+        return 1
+    print(f"As Told support-site self-test passed: {len(mutations) + len(privacy_mutations)} negative fixtures, 2 approved pages, public file allowlist and future-page discovery.")
+    return 0
+
+
+def main() -> int:
+    errors: list[str] = validate_public_files()
+    for relative_path in repository_html_paths():
+        if relative_path not in PAGES:
+            errors.append(f"unregistered HTML page {relative_path}")
+    for relative_path, canonical in PAGES.items():
+        path = ROOT / relative_path
+        if not path.is_file():
+            errors.append(f"missing {relative_path}")
+            continue
+        for error in validate_source(path.read_text(encoding="utf-8"), canonical):
+            errors.append(f"{relative_path}: {error}")
+
+    cname = ROOT / "CNAME"
+    if not cname.is_file() or cname.read_text(encoding="utf-8").strip() != "getastold.com":
+        errors.append("CNAME must contain only getastold.com")
+
+    agents = REPO_ROOT / "AGENTS.md"
+    if not agents.is_file():
+        errors.append("missing AGENTS.md")
+    else:
+        agent_text = agents.read_text(encoding="utf-8")
+        for marker in (
+            "https://github.com/ashrayastudio/getastold.git",
+            "`gh` CLI",
+            "macOS-keyring-backed credential helper",
+            "Hermes is a bounded backup",
+            "A sandbox denial requires narrow escalation",
+            "D-016",
+            "D-027",
+        ):
+            if marker not in agent_text:
+                errors.append(f"AGENTS.md missing governance marker {marker}")
+        for obsolete in (
+            "/Users/hermes/.local/bin/hermes -z",
+            "exclusive operator",
+        ):
+            if obsolete in agent_text:
+                errors.append(f"AGENTS.md contains obsolete governance marker {obsolete}")
+
+    if errors:
+        print("As Told support-site validation failed:", file=sys.stderr)
+        for error in errors:
+            print(f"- {error}", file=sys.stderr)
+        return 1
+
+    print("As Told support-site validation passed.")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(run_self_test() if "--self-test" in sys.argv[1:] else main())

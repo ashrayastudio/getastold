@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>As Told — Product information is being updated</title>
+  <meta name="description" content="Product information for As Told is being updated.">
+  <meta name="theme-color" content="#f0ebe1">
+  <link rel="canonical" href="https://getastold.com/">
+  <style>
+    :root {
+      color-scheme: light;
+      --linen: #f0ebe1;
+      --paper: #fdfaf6;
+      --ink: #0a1612;
+      --teal: #2c5a54;
+      --line: #d8cec0;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body { min-height: 100%; }
+
+    body {
+      margin: 0;
+      background: var(--linen);
+      color: var(--ink);
+      font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    main {
+      min-height: 100vh;
+      display: grid;
+      place-content: center;
+      gap: 1rem;
+      padding: 2rem;
+      text-align: center;
+    }
+
+    .product {
+      margin: 0;
+      color: var(--teal);
+      font-family: ui-serif, Georgia, serif;
+      font-size: clamp(2rem, 8vw, 4rem);
+      font-weight: 600;
+      letter-spacing: -0.02em;
+    }
+
+    .support { max-width: 32rem; line-height: 1.6; }
+    .support a { display: inline-block; max-width: 100%; min-height: 44px; padding: 0.6rem 0; color: var(--teal); overflow-wrap: anywhere; }
+    a:focus-visible { outline: 3px solid var(--teal); outline-offset: 4px; }
+    .support p { margin: 0.5rem 0; }
+
+    h1 {
+      max-width: 32rem;
+      margin: 0;
+      border-top: 1px solid var(--line);
+      padding-top: 1rem;
+      font-size: clamp(1rem, 3vw, 1.25rem);
+      font-weight: 500;
+      line-height: 1.5;
+    }
+  </style>
+</head>
+<body>
+  <main aria-labelledby="status">
+    <p class="product">As Told</p>
+    <h1 id="status">Product information is being updated.</h1>
+    <section class="support" aria-label="As Told support">
+      <p>As Told support: <a href="mailto:appportfolio.contact@gmail.com?subject=As%20Told%20support">appportfolio.contact@gmail.com</a></p>
+      <p>Please do not send private family stories, photos, voice recordings, or exports.</p>
+      <p>The email link opens your email app. Nothing is sent or attached automatically.</p>
+      <p><a href="/privacy">Website and support privacy</a></p>
+    </section>
+  </main>
+</body>
+</html>
