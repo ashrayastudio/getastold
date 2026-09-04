@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "services": [
+    {
+      "template_id": "porkbun.github-pages-dns-v1",
+      "enabled": true,
+      "domain": "getastold.com",
+      "companion_domain": "getastold.app",
+      "protected_mx": [
+        "10 fwd1.porkbun.com",
+        "20 fwd2.porkbun.com"
+      ],
+      "protected_txt": [
+        "v=spf1 include:_spf.porkbun.com ~all"
+      ]
+    }
+  ]
+}
