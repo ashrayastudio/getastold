@@ -20,9 +20,13 @@ Do not recover from chat memory or historical plans.
   metadata, markup, attributes, resources or links.
 - GitHub owner/repository identity is technical infrastructure only. Do not
   turn it into a public operator, brand, seller or copyright claim.
-- The only approved support mailbox is `appportfolio.contact@gmail.com`, with
-  exact subject `As Told support`; no alias, other recipient, body, cc/bcc or
-  automatic attachment. Show a copyable address and sensitive-content warning.
+- Public support is `support@madebykal.com`, with exact subject
+  `As Told support`; privacy requests use `privacy@madebykal.com` and security
+  reports use `security@madebykal.com`. These verified Made by Kal role
+  addresses replace the legacy Gmail contact. No catch-all, domain-wide
+  allowlist, unregistered alias, other recipient, body, cc/bcc, silent legacy
+  fallback, or automatic attachment is allowed. Show a copyable address and
+  sensitive-content warning.
 - The founder confirmed send/receive, monitoring the inbox and deleting
   resolved conversations within 90 days unless legally required longer.
   This is founder-reported process evidence, not an agent-observed mail test.
