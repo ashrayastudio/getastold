@@ -24,27 +24,87 @@ CONTROLLER_SENTENCE = "The data controller is Kalpesh Patel."
 ZOHO_PRIVACY = "https://www.zoho.com/privacy.html"
 GITHUB_PRIVACY = "https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement"
 HOME_TEXT = (
+    "Skip to content",
     "As Told",
-    "Product information is being updated.",
-    "As Told support:",
-    "support@madebykal.com",
-    SUPPORT_WARNING,
-    "The email link opens your email app. Nothing is sent or attached automatically.",
+    "How it works",
+    "Privacy",
+    "Support",
+    "A family storybook for iPhone and iPad",
+    "Every family story has more than one voice.",
+    "As Told helps you capture stories with narrator and recorder attribution, then organize them around the people and events that made them worth keeping.",
+    "See how As Told works",
+    "Get support",
+    "Family story",
+    "The recipe in the margin",
+    "“She never measured the cinnamon. She said the kitchen would tell you when it was enough.”",
+    "Told by",
+    "Grandmother",
+    "Recorded by",
+    "Jordan",
+    "Local-first",
+    "No ads",
+    "No third-party analytics",
+    "Sharing starts with you",
+    "Stories, kept in context",
+    "Capture what happened—and who remembers it.",
+    "As Told keeps the storyteller, the person recording, and the family context visible so a memory does not lose its voice over time.",
+    "01",
+    "Capture the details",
+    "Write or dictate a story, add selected photos, and keep its title, date, narrator, and recorder clear.",
+    "02",
+    "Organize the family view",
+    "Connect stories with people and events so family history becomes easier to browse over time.",
+    "03",
+    "Choose what to share",
+    "Select the stories you want in a Family Book, then use Apple’s share or save options when you are ready.",
+    "Private by design",
+    "Family stories are not advertising inventory.",
+    "As Told includes no ads or third-party analytics. This website adds no forms, analytics, advertising, or cookies. Read how the site and voluntary support email handle information.",
     "Website and support privacy",
+    "Thoughtful support",
+    "Get help without sending the family story itself.",
+    "Visit As Told support",
+    "As Told",
+    "Tell family stories together.",
+    "Privacy",
+    "Support",
 )
 SUPPORT_TEXT = (
+    "Skip to content",
     "As Told",
-    "Support",
-    "Email support@madebykal.com for help with As Told.",
+    "Home",
+    "Privacy",
+    "As Told support",
+    "Help without handing over your family archive.",
+    "Start with the device and app details that help us understand the issue while keeping private family content out of support email.",
+    "Before you email",
+    "Include your iPhone or iPad model, system version, app version, and brief steps that led to the issue.",
+    "Keep stories private",
     SUPPORT_WARNING,
+    "What the link opens",
     "The email link opens your email app with only an As Told support subject. Nothing is sent or attached automatically.",
-    "Email As Told support",
+    "What support can access",
+    "As Told support cannot open your on-device family archive through this website or support email.",
+    "Still need help?",
+    "Email",
+    "support@madebykal.com",
+    "for help with As Told.",
+    "Please keep the description focused on what happened rather than the private content of a story.",
     "Website and support privacy",
     "Back to As Told",
+    "As Told",
+    "Tell family stories together.",
+    "Home",
+    "Privacy",
 )
 PRIVACY_TEXT = (
+    "Skip to content",
     "As Told",
+    "Home",
+    "Support",
+    "As Told privacy",
     "Website and support privacy",
+    "How this website and voluntary support email handle information.",
     "Updated September 14, 2026.",
     "This notice covers this website and voluntary support email. App privacy information is being updated; this is not the full app privacy policy.",
     "Controller and contact",
@@ -66,7 +126,12 @@ PRIVACY_TEXT = (
     "privacy@madebykal.com",
     "for privacy questions or to request access, correction, or deletion of your support messages. Do not send identity documents or sensitive personal information with your initial request.",
     "Changes to this notice will appear on this page with an updated date.",
-    "Back to As Told support",
+    "As Told support",
+    "Back to As Told",
+    "As Told",
+    "Tell family stories together.",
+    "Home",
+    "Support",
 )
 APPROVED_SUPPORT_LINK = "mailto:support@madebykal.com?subject=As%20Told%20support"
 APPROVED_PRIVACY_LINK = "mailto:privacy@madebykal.com?subject=As%20Told%20privacy"
@@ -200,19 +265,54 @@ def validate_source(source: str, canonical: str) -> list[str]:
     support = canonical == PAGES[Path("support/index.html")]
     if privacy:
         expected_text = PRIVACY_TEXT
-        expected_title = "As Told — Website and support privacy"
-        expected_description = "How the As Told website and support email handle information."
-        expected_links = [APPROVED_SUPPORT_LINK, ZOHO_PRIVACY, GITHUB_PRIVACY, APPROVED_PRIVACY_LINK, "/"]
+        expected_title = "Website and support privacy — As Told"
+        expected_description = "How the As Told website and voluntary support email handle information."
+        expected_links = [
+            "#main",
+            "/",
+            "/",
+            "/support/",
+            APPROVED_SUPPORT_LINK,
+            ZOHO_PRIVACY,
+            GITHUB_PRIVACY,
+            APPROVED_PRIVACY_LINK,
+            "/support/",
+            "/",
+            "/",
+            "/support/",
+        ]
     elif support:
         expected_text = SUPPORT_TEXT
-        expected_title = "As Told — Support"
-        expected_description = "Contact As Told support."
-        expected_links = [APPROVED_SUPPORT_LINK, "/privacy", "/"]
+        expected_title = "Support — As Told"
+        expected_description = "Get help with As Told while keeping private family content out of support email."
+        expected_links = [
+            "#main",
+            "/",
+            "/",
+            "/privacy",
+            APPROVED_SUPPORT_LINK,
+            "/privacy",
+            "/",
+            "/",
+            "/privacy",
+        ]
     else:
         expected_text = HOME_TEXT
-        expected_title = "As Told — Product information is being updated"
-        expected_description = "Product information for As Told is being updated."
-        expected_links = [APPROVED_SUPPORT_LINK, "/privacy"]
+        expected_title = "As Told — Tell family stories together"
+        expected_description = "As Told helps you capture family stories with narrator and recorder attribution, then organize them around people and events."
+        expected_links = [
+            "#main",
+            "/",
+            "#how-it-works",
+            "#privacy",
+            "/support/",
+            "#how-it-works",
+            "/support/",
+            "/privacy",
+            "/support/",
+            "/privacy",
+            "/support/",
+        ]
     if canonical not in PAGES.values():
         errors.append("unregistered canonical")
     if parser.title.strip() != expected_title:
@@ -264,12 +364,12 @@ def run_self_test() -> int:
         source.replace("<main ", '<main title="%2541shraya" '),
         source.replace("<main ", '<main title="Kalpesh Patel" '),
         source.replace("<main ", '<main title="other%40gmail.com" '),
-        source.replace(APPROVED_SUPPORT_LINK, "mailto:other@gmail.com?subject=As%20Told%20support"),
-        source.replace(APPROVED_SUPPORT_LINK, APPROVED_SUPPORT_LINK + "&amp;cc=other@gmail.com"),
-        source.replace("support@madebykal.com", "support+astold@madebykal.com"),
-        source.replace("support@madebykal.com", "hello@madebykal.com"),
-        source.replace("support@madebykal.com", "support@madebykal.com.evil.example"),
-        source.replace("As Told</p>", "Ashraya</p>"),
+        source.replace('href="/support/"', 'href="mailto:other@gmail.com?subject=As%20Told%20support"', 1),
+        source.replace('href="/support/"', f'href="{APPROVED_SUPPORT_LINK}&amp;cc=other@gmail.com"', 1),
+        source.replace("</main>", "<p>support+astold@madebykal.com</p></main>"),
+        source.replace("</main>", "<p>hello@madebykal.com</p></main>"),
+        source.replace("</main>", "<p>support@madebykal.com.evil.example</p></main>"),
+        source.replace("<strong>As Told</strong>", "<strong>Ashraya</strong>"),
         source.replace("</main>", "<p>Download on the App Store</p></main>"),
         source.replace("</main>", "<form></form></main>"),
         source.replace("</main>", "<script></script></main>"),

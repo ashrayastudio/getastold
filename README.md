@@ -1,11 +1,11 @@
 # As Told support website
 
-Static website and support-email privacy notice for `getastold.com`.
+Static product and support website for `getastold.com`.
 This is not the iOS application or its full privacy policy.
 
 ## Routes
 
-- `/` — product update and shared support contact.
+- `/` — product overview.
 - `/support/` — dedicated App Store support destination.
 - `/privacy` — website hosting and support-email privacy.
 - `/privacy.html` — the same privacy document.
