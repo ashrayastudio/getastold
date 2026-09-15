@@ -37,9 +37,11 @@ Do not recover from chat memory or historical plans.
   Do not imply it is the full app policy or add unverified app features,
   family/collaboration behavior, pricing, release availability, App Store
   links, legal-compliance promises, analytics, forms, ads or third-party assets.
-- Preserve the dependency-free static architecture, existing route map and
-  responsive keyboard-accessible controls. Only `docs/` is published; its exact
-  file allowlist is `index.html`, `privacy.html`, `CNAME`, `.nojekyll`. Never
+- Preserve the dependency-free static architecture and responsive
+  keyboard-accessible controls. The route map is `/`, `/support/`, and
+  `/privacy` (`/privacy.html` is the same privacy document). Only `docs/` is
+  published; its exact file allowlist is `index.html`, `support/index.html`,
+  `privacy.html`, `CNAME`, `.nojekyll`. Never
   publish repository instructions, validators or README. No other-host migration.
 
 ## Validation

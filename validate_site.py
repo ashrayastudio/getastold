@@ -16,6 +16,7 @@ REPO_ROOT = Path(__file__).resolve().parent
 ROOT = REPO_ROOT / "docs"
 PAGES = {
     Path("index.html"): "https://getastold.com/",
+    Path("support/index.html"): "https://getastold.com/support/",
     Path("privacy.html"): "https://getastold.com/privacy",
 }
 SUPPORT_WARNING = "Please do not send private family stories, photos, voice recordings, or exports."
@@ -30,6 +31,16 @@ HOME_TEXT = (
     SUPPORT_WARNING,
     "The email link opens your email app. Nothing is sent or attached automatically.",
     "Website and support privacy",
+)
+SUPPORT_TEXT = (
+    "As Told",
+    "Support",
+    "Email support@madebykal.com for help with As Told.",
+    SUPPORT_WARNING,
+    "The email link opens your email app with only an As Told support subject. Nothing is sent or attached automatically.",
+    "Email As Told support",
+    "Website and support privacy",
+    "Back to As Told",
 )
 PRIVACY_TEXT = (
     "As Told",
@@ -79,11 +90,11 @@ def repository_html_paths(root: Path = ROOT) -> list[Path]:
 
 
 def validate_public_files(root: Path = ROOT) -> list[str]:
-    expected = {"index.html", "privacy.html", "CNAME", ".nojekyll"}
+    expected = {"index.html", "support/index.html", "privacy.html", "CNAME", ".nojekyll"}
     files = {path.relative_to(root).as_posix() for path in root.rglob("*") if path.is_file()}
     errors = []
     if files != expected:
-        errors.append("public directory differs from the exact four-file allowlist")
+        errors.append("public directory differs from the exact five-file allowlist")
     if any(path.is_symlink() for path in root.rglob("*")):
         errors.append("public symlinks are not permitted")
     marker = root / ".nojekyll"
@@ -186,10 +197,22 @@ def validate_source(source: str, canonical: str) -> list[str]:
     ).lower()
 
     privacy = canonical == PAGES[Path("privacy.html")]
-    expected_text = PRIVACY_TEXT if privacy else HOME_TEXT
-    expected_title = "As Told — Website and support privacy" if privacy else "As Told — Product information is being updated"
-    expected_description = "How the As Told website and support email handle information." if privacy else "Product information for As Told is being updated."
-    expected_links = [APPROVED_SUPPORT_LINK, ZOHO_PRIVACY, GITHUB_PRIVACY, APPROVED_PRIVACY_LINK, "/"] if privacy else [APPROVED_SUPPORT_LINK, "/privacy"]
+    support = canonical == PAGES[Path("support/index.html")]
+    if privacy:
+        expected_text = PRIVACY_TEXT
+        expected_title = "As Told — Website and support privacy"
+        expected_description = "How the As Told website and support email handle information."
+        expected_links = [APPROVED_SUPPORT_LINK, ZOHO_PRIVACY, GITHUB_PRIVACY, APPROVED_PRIVACY_LINK, "/"]
+    elif support:
+        expected_text = SUPPORT_TEXT
+        expected_title = "As Told — Support"
+        expected_description = "Contact As Told support."
+        expected_links = [APPROVED_SUPPORT_LINK, "/privacy", "/"]
+    else:
+        expected_text = HOME_TEXT
+        expected_title = "As Told — Product information is being updated"
+        expected_description = "Product information for As Told is being updated."
+        expected_links = [APPROVED_SUPPORT_LINK, "/privacy"]
     if canonical not in PAGES.values():
         errors.append("unregistered canonical")
     if parser.title.strip() != expected_title:
@@ -261,6 +284,20 @@ def run_self_test() -> int:
         if not validate_source(mutation, PAGES[Path("index.html")]):
             print(f"self-test mutation {number} was not rejected", file=sys.stderr)
             return 1
+    support = (ROOT / "support" / "index.html").read_text(encoding="utf-8")
+    support_mutations = (
+        support.replace(APPROVED_SUPPORT_LINK, "mailto:other@gmail.com?subject=As%20Told%20support"),
+        support.replace(APPROVED_SUPPORT_LINK, APPROVED_SUPPORT_LINK + "&amp;body=private"),
+        support.replace(SUPPORT_WARNING, "Send family stories and recordings."),
+        support.replace("https://getastold.com/support/", "https://example.invalid/support/"),
+        support.replace("Nothing is sent or attached automatically.", "Diagnostics are attached automatically."),
+        support.replace("</main>", "<p>The data controller is Kalpesh Patel.</p></main>"),
+        support.replace("</main>", '<img src="https://example.invalid/pixel.png" alt=""></main>'),
+    )
+    for number, mutation in enumerate(support_mutations, start=1):
+        if not validate_source(mutation, PAGES[Path("support/index.html")]):
+            print(f"support self-test mutation {number} was not rejected", file=sys.stderr)
+            return 1
     privacy = (ROOT / "privacy.html").read_text(encoding="utf-8")
     privacy_mutations = (
         privacy.replace(CONTROLLER_SENTENCE, "The data controller is As Told."),
@@ -296,8 +333,10 @@ def run_self_test() -> int:
             return 1
     with tempfile.TemporaryDirectory(prefix="astold-public-files.") as temporary:
         root = Path(temporary)
-        for name in ("index.html", "privacy.html", "CNAME", ".nojekyll"):
-            (root / name).touch()
+        for name in ("index.html", "support/index.html", "privacy.html", "CNAME", ".nojekyll"):
+            path = root / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.touch()
         if validate_public_files(root):
             print("self-test rejected the exact public file set", file=sys.stderr)
             return 1
@@ -319,7 +358,8 @@ def run_self_test() -> int:
     if validate_public_files():
         print("self-test approved public file set rejected", file=sys.stderr)
         return 1
-    print(f"As Told support-site self-test passed: {len(mutations) + len(privacy_mutations)} negative fixtures, 2 approved pages, public file allowlist and future-page discovery.")
+    fixture_count = len(mutations) + len(support_mutations) + len(privacy_mutations)
+    print(f"As Told support-site self-test passed: {fixture_count} negative fixtures, 3 approved pages, public file allowlist and future-page discovery.")
     return 0
 
 

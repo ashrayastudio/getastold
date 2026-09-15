@@ -6,6 +6,7 @@ This is not the iOS application or its full privacy policy.
 ## Routes
 
 - `/` — product update and shared support contact.
+- `/support/` — dedicated App Store support destination.
 - `/privacy` — website hosting and support-email privacy.
 - `/privacy.html` — the same privacy document.
 
